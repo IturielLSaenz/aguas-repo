@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,20 +9,44 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  UploadedFiles,
+  UseFilters,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { ReportesService } from './reportes.service';
 import { CreateReporteDto } from './dto/create-reporte.dto';
 import { UpdateReporteDto } from './dto/update-reporte.dto';
 import { ModerarReporteDto } from './dto/moderar-reporte.dto';
 import { ReporteResponseDto } from './dto/reporte-response.dto';
+import {
+  evidenciaMulterOptions,
+  MAX_ARCHIVOS,
+} from '../common/multer/evidencia-multer.config';
+import { MulterExceptionFilter } from '../common/multer/multer-exception.filter';
 
 @Controller('reportes')
 export class ReportesController {
   constructor(private readonly service: ReportesService) {}
 
+  // Petición multipart/form-data: los campos de texto de CreateReporteDto
+  // + de 1 a 3 archivos en el campo "archivos" (obligatorios, máx. 5MB c/u).
+  // Esto crea el reporte COMPLETO de una sola vez.
   @Post()
-  async create(@Body() dto: CreateReporteDto) {
-    const reporte = await this.service.create(dto);
+  @UseFilters(MulterExceptionFilter)
+  @UseInterceptors(
+    FilesInterceptor('archivos', MAX_ARCHIVOS, evidenciaMulterOptions),
+  )
+  async create(
+    @Body() dto: CreateReporteDto,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException(
+        'Debes adjuntar al menos un archivo de evidencia (máximo 3).',
+      );
+    }
+    const reporte = await this.service.create(dto, files);
     return ReporteResponseDto.fromEntity(reporte);
   }
 

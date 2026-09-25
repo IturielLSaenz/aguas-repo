@@ -5,7 +5,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { RolesModule } from './roles/roles.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
-import { TiposFraudeModule } from './tipos-fraude/tipos-fraude.module';
 import { ReportesModule } from './reportes/reportes.module';
 import { EvidenciaModule } from './evidencia/evidencia.module';
 import { BitacoraModule } from './bitacora/bitacora.module';
@@ -35,7 +34,6 @@ import { NotificacionesModule } from './notificaciones/notificaciones.module';
 
     RolesModule,
     UsuariosModule,
-    TiposFraudeModule,
     ReportesModule,
     EvidenciaModule,
     BitacoraModule,

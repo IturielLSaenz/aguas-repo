@@ -8,7 +8,6 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
-import { TipoFraude } from '../../tipos-fraude/entities/tipo-fraude.entity';
 import { Bitacora } from '../../bitacora/entities/bitacora.entity';
 import { Evidencia } from '../../evidencia/entities/evidencia.entity';
 
@@ -19,6 +18,9 @@ export enum EstadoReporte {
   RECHAZADO = 'rechazado',
 }
 
+// El proyecto ya solo maneja un tipo de caso (phishing/spoofing), así que
+// no existe más el concepto de "tipo de fraude" — un Reporte ya es, por
+// definición, ese tipo de caso. Ver tipos-fraude retirado del proyecto.
 @Entity('reporte')
 export class Reporte {
   @PrimaryGeneratedColumn({ name: 'id_reporte' })
@@ -28,18 +30,20 @@ export class Reporte {
   @JoinColumn({ name: 'id_usuario' })
   usuario: Usuario;
 
-  @ManyToOne(() => TipoFraude, (tipoFraude) => tipoFraude.reportes)
-  @JoinColumn({ name: 'id_tipo_fraude' })
-  tipoFraude: TipoFraude;
+  // Ya no obligatoria: nace vacía en el paso 1 (datos del estafador) y se
+  // llena en el paso 2, junto con la evidencia. Sigue siendo opcional
+  // incluso en el paso 2 (el usuario puede no escribir nada extra).
+  @Column('text', { nullable: true })
+  descripcion: string | null;
 
-  @Column('text')
-  descripcion: string;
+  @Column({ type: 'varchar', name: 'telefono_estafador', length: 20, nullable: true })
+  telefonoEstafador: string | null;
+
+  @Column({ type: 'varchar', name: 'enlace_sospechoso', length: 255, nullable: true })
+  enlaceSospechoso: string | null;
 
   @CreateDateColumn({ name: 'fecha_reporte' })
   fechaReporte: Date;
-
-  @Column('decimal', { precision: 12, scale: 2, nullable: true })
-  monto: number | null;
 
   @Column({ name: 'empresa_suplantada', length: 150, nullable: true })
   empresaSuplantada: string;

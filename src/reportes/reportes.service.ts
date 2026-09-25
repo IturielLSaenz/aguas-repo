@@ -6,10 +6,10 @@ import { CreateReporteDto } from './dto/create-reporte.dto';
 import { UpdateReporteDto } from './dto/update-reporte.dto';
 import { ModerarReporteDto } from './dto/moderar-reporte.dto';
 import { UsuariosService } from '../usuarios/usuarios.service';
-import { TiposFraudeService } from '../tipos-fraude/tipos-fraude.service';
 import { BitacoraService } from '../bitacora/bitacora.service';
 import { RevisionReporteService } from '../revision-reporte/revision-reporte.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import { EvidenciaService } from '../evidencia/evidencia.service';
 
 @Injectable()
 export class ReportesService {
@@ -17,35 +17,46 @@ export class ReportesService {
     @InjectRepository(Reporte)
     private readonly repository: Repository<Reporte>,
     private readonly usuariosService: UsuariosService,
-    private readonly tiposFraudeService: TiposFraudeService,
     private readonly bitacoraService: BitacoraService,
     private readonly revisionReporteService: RevisionReporteService,
     private readonly notificacionesService: NotificacionesService,
+    private readonly evidenciaService: EvidenciaService,
   ) {}
 
-  async create(dto: CreateReporteDto): Promise<Reporte> {
-    // findOne de cada service ya lanza NotFoundException si el id no existe
+  // Crea el reporte COMPLETO de una sola vez: datos del estafador,
+  // descripción, y de 1 a 3 evidencias — todo en la misma petición. No hay
+  // un paso intermedio a medio guardar: el reporte solo existe en el
+  // backend a partir de que el usuario le dio "Enviar" en la app.
+  async create(
+    dto: CreateReporteDto,
+    files: Express.Multer.File[],
+  ): Promise<Reporte> {
+    // findOne ya lanza NotFoundException si el usuario no existe
     const usuario = await this.usuariosService.findOne(dto.idUsuario);
-    const tipoFraude = await this.tiposFraudeService.findOne(
-      dto.idTipoFraude,
-    );
 
     const reporte = this.repository.create({
       usuario,
-      tipoFraude,
-      descripcion: dto.descripcion,
-      monto: dto.monto ?? null,
+      descripcion: dto.descripcion ?? null,
+      telefonoEstafador: dto.telefonoEstafador,
+      enlaceSospechoso: dto.enlaceSospechoso,
       empresaSuplantada: dto.empresaSuplantada,
       // estado nace en 'pendiente' por el DEFAULT de la base de datos
     });
-    return this.repository.save(reporte);
+    const guardado = await this.repository.save(reporte);
+
+    // crearVarias muta guardado.evidenciaPrincipal si corresponde (ver
+    // EvidenciaService) — como es el mismo objeto en memoria, ya queda
+    // reflejado aquí sin necesidad de volver a consultarlo.
+    await this.evidenciaService.crearVarias(guardado, files);
+
+    return guardado;
   }
 
   // RF04 - buscador público: solo reportes ya verificados por moderación
   findPublicos(): Promise<Reporte[]> {
     return this.repository.find({
       where: { estado: EstadoReporte.VERIFICADO },
-      relations: ['usuario', 'tipoFraude'],
+      relations: ['usuario'],
       order: { fechaReporte: 'DESC' },
     });
   }
@@ -53,7 +64,7 @@ export class ReportesService {
   // Panel de moderación: todos los reportes, sin importar estado
   findAll(): Promise<Reporte[]> {
     return this.repository.find({
-      relations: ['usuario', 'tipoFraude'],
+      relations: ['usuario'],
       order: { fechaReporte: 'DESC' },
     });
   }
@@ -61,7 +72,7 @@ export class ReportesService {
   async findOne(id: number): Promise<Reporte> {
     const reporte = await this.repository.findOne({
       where: { idReporte: id },
-      relations: ['usuario', 'tipoFraude'],
+      relations: ['usuario'],
     });
     if (!reporte) {
       throw new NotFoundException(`Reporte ${id} no encontrado`);
@@ -69,18 +80,22 @@ export class ReportesService {
     return reporte;
   }
 
+  // Edición posterior (ej. corregir un dato ya enviado). Puede tocar
+  // incluso "descripcion", porque UpdateReporteDto sale de CreateReporteDto.
   async update(id: number, dto: UpdateReporteDto): Promise<Reporte> {
     const reporte = await this.findOne(id);
 
-    if (dto.idTipoFraude !== undefined) {
-      reporte.tipoFraude = await this.tiposFraudeService.findOne(
-        dto.idTipoFraude,
-      );
+    if (dto.telefonoEstafador !== undefined) {
+      reporte.telefonoEstafador = dto.telefonoEstafador;
     }
-    if (dto.descripcion !== undefined) reporte.descripcion = dto.descripcion;
-    if (dto.monto !== undefined) reporte.monto = dto.monto;
+    if (dto.enlaceSospechoso !== undefined) {
+      reporte.enlaceSospechoso = dto.enlaceSospechoso;
+    }
     if (dto.empresaSuplantada !== undefined) {
       reporte.empresaSuplantada = dto.empresaSuplantada;
+    }
+    if (dto.descripcion !== undefined) {
+      reporte.descripcion = dto.descripcion;
     }
 
     return this.repository.save(reporte);
@@ -122,18 +137,5 @@ export class ReportesService {
   async remove(id: number): Promise<void> {
     const reporte = await this.findOne(id);
     await this.repository.remove(reporte);
-  }
-
-  // Usado por EvidenciaService: la primera evidencia subida a un reporte
-  // se vuelve automáticamente su "portada", si todavía no tenía una.
-  async setEvidenciaPrincipalSiVacia(
-    idReporte: number,
-    archivo: string,
-  ): Promise<void> {
-    const reporte = await this.findOne(idReporte);
-    if (!reporte.evidenciaPrincipal) {
-      reporte.evidenciaPrincipal = archivo;
-      await this.repository.save(reporte);
-    }
   }
 }

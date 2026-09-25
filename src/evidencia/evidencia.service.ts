@@ -1,38 +1,102 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Evidencia } from './entities/evidencia.entity';
-import { CreateEvidenciaDto } from './dto/create-evidencia.dto';
-import { ReportesService } from '../reportes/reportes.service';
+import { Reporte } from '../reportes/entities/reporte.entity';
+import { extname } from 'node:path';
 
+// OJO: este service usa el repositorio de Reporte directo (no
+// ReportesService), a propósito: así evitamos que EvidenciaModule y
+// ReportesModule se necesiten mutuamente (dependencia circular). Ahora es
+// ReportesModule quien depende de EvidenciaModule, nunca al revés.
 @Injectable()
 export class EvidenciaService {
   constructor(
     @InjectRepository(Evidencia)
     private readonly repository: Repository<Evidencia>,
-    private readonly reportesService: ReportesService,
+    @InjectRepository(Reporte)
+    private readonly reporteRepository: Repository<Reporte>,
   ) {}
 
-  async create(dto: CreateEvidenciaDto): Promise<Evidencia> {
-    // findOne ya lanza NotFoundException si el reporte no existe
-    const reporte = await this.reportesService.findOne(dto.idReporte);
+  private async setEvidenciaPrincipalSiVacia(
+    reporte: Reporte,
+    archivoUrl: string,
+  ): Promise<void> {
+    if (!reporte.evidenciaPrincipal) {
+      reporte.evidenciaPrincipal = archivoUrl;
+      await this.reporteRepository.save(reporte);
+    }
+  }
+
+  private async crearDesdeArchivo(
+    reporte: Reporte,
+    file: Express.Multer.File,
+  ): Promise<Evidencia> {
+    const archivoUrl = `/uploads/${file.filename}`;
+    const extension = extname(file.originalname).toLowerCase().replace('.', '');
+    const tipoEvidencia =
+      file.mimetype === 'application/pdf' || extension === 'pdf'
+        ? 'pdf'
+        : 'imagen';
 
     const evidencia = this.repository.create({
       reporte,
-      tipoEvidencia: dto.tipoEvidencia,
-      archivo: dto.archivo,
-      formato: dto.formato,
-      descripcion: dto.descripcion,
+      tipoEvidencia,
+      archivo: archivoUrl,
+      formato: extension,
     });
     const guardada = await this.repository.save(evidencia);
 
-    // Regla de negocio acordada: la primera evidencia se vuelve la portada
-    await this.reportesService.setEvidenciaPrincipalSiVacia(
-      dto.idReporte,
-      dto.archivo,
-    );
+    // Regla de negocio: la primera evidencia que llega se vuelve la
+    // portada. Muta reporte.evidenciaPrincipal directo en el objeto que
+    // recibimos, así quien nos lo pasó (ReportesService) ve el cambio
+    // reflejado sin tener que volver a consultarlo.
+    await this.setEvidenciaPrincipalSiVacia(reporte, archivoUrl);
 
     return guardada;
+  }
+
+  // Sube de 1 a 3 archivos (ya validados por Multer: tipo y 5MB c/u) y crea
+  // una fila de evidencia por cada uno, en el orden en que llegaron.
+  // Recibe el objeto Reporte ya cargado (no un id) para poder usarse tanto
+  // desde ReportesService.create() como desde el endpoint suelto de abajo.
+  async crearVarias(
+    reporte: Reporte,
+    files: Express.Multer.File[],
+  ): Promise<Evidencia[]> {
+    if (!files || files.length === 0) {
+      throw new BadRequestException(
+        'Debes adjuntar al menos un archivo de evidencia.',
+      );
+    }
+    const evidencias: Evidencia[] = [];
+    for (const file of files) {
+      // secuencial (no Promise.all): así la primera evidencia en llegar es
+      // siempre la que se vuelve evidencia_principal, sin condiciones de
+      // carrera entre los distintos archivos.
+      evidencias.push(await this.crearDesdeArchivo(reporte, file));
+    }
+    return evidencias;
+  }
+
+  // Endpoint suelto: adjuntar más evidencia a un reporte que YA existe
+  // (ej. el usuario quiere agregar más pruebas después de haber enviado
+  // su reporte original).
+  async create(
+    idReporte: number,
+    files: Express.Multer.File[],
+  ): Promise<Evidencia[]> {
+    const reporte = await this.reporteRepository.findOne({
+      where: { idReporte },
+    });
+    if (!reporte) {
+      throw new NotFoundException(`Reporte ${idReporte} no encontrado`);
+    }
+    return this.crearVarias(reporte, files);
   }
 
   findByReporte(idReporte: number): Promise<Evidencia[]> {
