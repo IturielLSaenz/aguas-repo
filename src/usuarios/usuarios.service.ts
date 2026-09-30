@@ -5,13 +5,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import * as bcrypt from 'bcrypt';
+import { createHash } from 'node:crypto';
 import { Usuario } from './entities/usuario.entity';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { RolesService } from '../roles/roles.service';
-
-const SALT_ROUNDS = 10;
 
 @Injectable()
 export class UsuariosService {
@@ -31,7 +29,7 @@ export class UsuariosService {
 
     // findOne del RolesService ya lanza NotFoundException si idRol no existe
     const rol = await this.rolesService.findOne(dto.idRol);
-    const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
+    const passwordHash = hash(dto.password);
 
     const usuario = this.repository.create({
       nombre: dto.nombre,
@@ -84,4 +82,8 @@ export class UsuariosService {
     const usuario = await this.findOne(id);
     await this.repository.remove(usuario);
   }
+}
+
+export function hash(password: string): string {
+  return createHash('sha256').update(password).digest('hex');
 }
