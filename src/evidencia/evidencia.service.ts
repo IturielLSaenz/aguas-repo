@@ -1,18 +1,20 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import type { Pool, RowDataPacket } from 'mysql2/promise';
+import { DB_POOL } from '../database/database.module';
 import { Evidencia } from './entities/evidencia.entity';
 import { Reporte } from '../reportes/entities/reporte.entity';
+import { EvidenciaResponseDto } from './dto/evidencia-response.dto';
 import { extname } from 'node:path';
 
-// OJO: este service usa el repositorio de Reporte directo (no
-// ReportesService), a propósito: así evitamos que EvidenciaModule y
-// ReportesModule se necesiten mutuamente (dependencia circular). Ahora es
-// ReportesModule quien depende de EvidenciaModule, nunca al revés.
+// Este service usa el repositorio de Reporte directo (no ReportesService)
+// para evitar la dependencia circular entre EvidenciaModule y ReportesModule.
 @Injectable()
 export class EvidenciaService {
   constructor(
@@ -20,6 +22,8 @@ export class EvidenciaService {
     private readonly repository: Repository<Evidencia>,
     @InjectRepository(Reporte)
     private readonly reporteRepository: Repository<Reporte>,
+    @Inject(DB_POOL)
+    private readonly pool: Pool,
   ) {}
 
   private async setEvidenciaPrincipalSiVacia(
@@ -51,19 +55,12 @@ export class EvidenciaService {
     });
     const guardada = await this.repository.save(evidencia);
 
-    // Regla de negocio: la primera evidencia que llega se vuelve la
-    // portada. Muta reporte.evidenciaPrincipal directo en el objeto que
-    // recibimos, así quien nos lo pasó (ReportesService) ve el cambio
-    // reflejado sin tener que volver a consultarlo.
+    // La primera evidencia que llega se vuelve la portada del reporte.
     await this.setEvidenciaPrincipalSiVacia(reporte, archivoUrl);
 
     return guardada;
   }
 
-  // Sube de 1 a 3 archivos (ya validados por Multer: tipo y 5MB c/u) y crea
-  // una fila de evidencia por cada uno, en el orden en que llegaron.
-  // Recibe el objeto Reporte ya cargado (no un id) para poder usarse tanto
-  // desde ReportesService.create() como desde el endpoint suelto de abajo.
   async crearVarias(
     reporte: Reporte,
     files: Express.Multer.File[],
@@ -75,17 +72,12 @@ export class EvidenciaService {
     }
     const evidencias: Evidencia[] = [];
     for (const file of files) {
-      // secuencial (no Promise.all): así la primera evidencia en llegar es
-      // siempre la que se vuelve evidencia_principal, sin condiciones de
-      // carrera entre los distintos archivos.
       evidencias.push(await this.crearDesdeArchivo(reporte, file));
     }
     return evidencias;
   }
 
-  // Endpoint suelto: adjuntar más evidencia a un reporte que YA existe
-  // (ej. el usuario quiere agregar más pruebas después de haber enviado
-  // su reporte original).
+  // Endpoint suelto: adjuntar más evidencia a un reporte que YA existe.
   async create(
     idReporte: number,
     files: Express.Multer.File[],
@@ -99,9 +91,18 @@ export class EvidenciaService {
     return this.crearVarias(reporte, files);
   }
 
-  findByReporte(idReporte: number): Promise<Evidencia[]> {
-    return this.repository.find({
-      where: { reporte: { idReporte } },
+  // Lista las evidencias de un reporte, leídas con SQL directo.
+  async findByReporte(idReporte: string): Promise<EvidenciaResponseDto[]> {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT * FROM evidencia WHERE id_reporte = ${idReporte}`,
+    );
+    return rows.map((row) => {
+      const dto = new EvidenciaResponseDto();
+      dto.idEvidencia = row.id_evidencia;
+      dto.tipoEvidencia = row.tipo_evidencia;
+      dto.archivoUrl = row.archivo;
+      dto.formato = row.formato;
+      return dto;
     });
   }
 

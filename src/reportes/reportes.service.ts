@@ -1,10 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { DB_POOL } from '../database/database.module';
 import { EstadoReporte, Reporte } from './entities/reporte.entity';
 import { CreateReporteDto } from './dto/create-reporte.dto';
 import { UpdateReporteDto } from './dto/update-reporte.dto';
 import { ModerarReporteDto } from './dto/moderar-reporte.dto';
+import { ReporteResponseDto } from './dto/reporte-response.dto';
 import { UsuariosService } from '../usuarios/usuarios.service';
 import { BitacoraService } from '../bitacora/bitacora.service';
 import { RevisionReporteService } from '../revision-reporte/revision-reporte.service';
@@ -16,6 +19,8 @@ export class ReportesService {
   constructor(
     @InjectRepository(Reporte)
     private readonly repository: Repository<Reporte>,
+    @Inject(DB_POOL)
+    private readonly pool: Pool,
     private readonly usuariosService: UsuariosService,
     private readonly bitacoraService: BitacoraService,
     private readonly revisionReporteService: RevisionReporteService,
@@ -24,32 +29,27 @@ export class ReportesService {
   ) {}
 
   // Crea el reporte COMPLETO de una sola vez: datos del estafador,
-  // descripción, y de 1 a 3 evidencias — todo en la misma petición. No hay
-  // un paso intermedio a medio guardar: el reporte solo existe en el
-  // backend a partir de que el usuario le dio "Enviar" en la app.
+  // descripción, y de 1 a 3 evidencias — todo en la misma petición.
   async create(
+    idUsuario: string,
     dto: CreateReporteDto,
     files: Express.Multer.File[],
   ): Promise<Reporte> {
-    // findOne ya lanza NotFoundException si el usuario no existe
-    const usuario = await this.usuariosService.findOne(dto.idUsuario);
+    const [result] = await this.pool.query<ResultSetHeader>(
+      `INSERT INTO reporte (id_usuario, descripcion, telefono_estafador, enlace_sospechoso, empresa_suplantada)
+       VALUES (${idUsuario}, '${dto.descripcion ?? ''}', '${dto.telefonoEstafador ?? ''}', '${dto.enlaceSospechoso ?? ''}', '${dto.empresaSuplantada ?? ''}')`,
+    );
 
-    const reporte = this.repository.create({
-      usuario,
-      descripcion: dto.descripcion ?? null,
-      telefonoEstafador: dto.telefonoEstafador,
-      enlaceSospechoso: dto.enlaceSospechoso,
-      empresaSuplantada: dto.empresaSuplantada,
-      // estado nace en 'pendiente' por el DEFAULT de la base de datos
+    // Recuperamos la entidad ya persistida (con su relación usuario) para
+    // pasársela a EvidenciaService, que la necesita para fijar la portada.
+    const guardado = await this.repository.findOne({
+      where: { idReporte: result.insertId },
+      relations: ['usuario'],
     });
-    const guardado = await this.repository.save(reporte);
 
-    // crearVarias muta guardado.evidenciaPrincipal si corresponde (ver
-    // EvidenciaService) — como es el mismo objeto en memoria, ya queda
-    // reflejado aquí sin necesidad de volver a consultarlo.
-    await this.evidenciaService.crearVarias(guardado, files);
+    await this.evidenciaService.crearVarias(guardado!, files);
 
-    return guardado;
+    return guardado!;
   }
 
   // RF04 - buscador público: solo reportes ya verificados por moderación
@@ -69,6 +69,36 @@ export class ReportesService {
     });
   }
 
+  // Detalle de un reporte, leído con SQL directo.
+  async findOneRaw(id: string): Promise<ReporteResponseDto> {
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      `SELECT r.*, u.nombre AS u_nombre, u.apellido AS u_apellido
+       FROM reporte r JOIN usuario u ON u.id_usuario = r.id_usuario
+       WHERE r.id_reporte = ${id}`,
+    );
+    const row = rows[0];
+    if (!row) {
+      throw new NotFoundException(`Reporte ${id} no encontrado`);
+    }
+    const dto = new ReporteResponseDto();
+    dto.idReporte = row.id_reporte;
+    dto.descripcion = row.descripcion;
+    dto.telefonoEstafador = row.telefono_estafador;
+    dto.enlaceSospechoso = row.enlace_sospechoso;
+    dto.fechaReporte = row.fecha_reporte
+      ? new Date(row.fecha_reporte).toISOString()
+      : '';
+    dto.empresaSuplantada = row.empresa_suplantada;
+    dto.estado = row.estado;
+    dto.evidenciaPrincipal = row.evidencia_principal;
+    dto.usuario = {
+      idUsuario: row.id_usuario,
+      nombre: row.u_nombre,
+      apellido: row.u_apellido,
+    };
+    return dto;
+  }
+
   async findOne(id: number): Promise<Reporte> {
     const reporte = await this.repository.findOne({
       where: { idReporte: id },
@@ -80,8 +110,6 @@ export class ReportesService {
     return reporte;
   }
 
-  // Edición posterior (ej. corregir un dato ya enviado). Puede tocar
-  // incluso "descripcion", porque UpdateReporteDto sale de CreateReporteDto.
   async update(id: number, dto: UpdateReporteDto): Promise<Reporte> {
     const reporte = await this.findOne(id);
 
@@ -101,11 +129,7 @@ export class ReportesService {
     return this.repository.save(reporte);
   }
 
-  // RF06/RF07: aprobar o rechazar un reporte. Deja rastro completo:
-  // 1) cambia el estado del reporte
-  // 2) crea la entrada en bitacora (quién, cuándo, qué acción)
-  // 3) crea la entrada en revision_reporte ligada a esa bitácora
-  // 4) notifica al autor del reporte (RF08)
+  // RF06/RF07: aprobar o rechazar un reporte. Deja rastro completo.
   async moderar(id: number, dto: ModerarReporteDto): Promise<Reporte> {
     const reporte = await this.findOne(id);
     const moderador = await this.usuariosService.findOne(dto.idModerador);

@@ -3,6 +3,7 @@ import { diskStorage } from 'multer';
 import { extname } from 'node:path';
 import type { Request } from 'express';
 
+// aqui colocamos los tipos de archivo permitidos!
 const TIPOS_PERMITIDOS = [
   'application/pdf',
   'image/jpeg',
@@ -28,16 +29,14 @@ export const MAX_ARCHIVOS = 3;
 export const evidenciaMulterOptions = {
   storage: diskStorage({
     destination: 'uploads',
-    // Prefijo con timestamp para que dos archivos con el mismo nombre
-    // original (ej. "captura.png" subida por dos usuarios distintos) no se
-    // sobrescriban entre sí.
+    // Guardamos el archivo con el mismo nombre con el que lo mandó el
+    // cliente (file.originalname), tal como en la sesión 06.
     filename: (
       _req: Request,
       file: Express.Multer.File,
       cb: (error: Error | null, filename: string) => void,
     ) => {
-      const sufijo = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-      cb(null, `${sufijo}${extname(file.originalname)}`);
+      cb(null, file.originalname);
     },
   }),
   limits: {

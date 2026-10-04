@@ -3,6 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Reporte } from './entities/reporte.entity';
 import { ReportesService } from './reportes.service';
 import { ReportesController } from './reportes.controller';
+import { DatabaseModule } from '../database/database.module';
+import { AuthModule } from '../auth/auth.module';
 import { UsuariosModule } from '../usuarios/usuarios.module';
 import { BitacoraModule } from '../bitacora/bitacora.module';
 import { RevisionReporteModule } from '../revision-reporte/revision-reporte.module';
@@ -12,6 +14,8 @@ import { EvidenciaModule } from '../evidencia/evidencia.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Reporte]),
+    DatabaseModule,
+    AuthModule,
     UsuariosModule,
     BitacoraModule,
     RevisionReporteModule,

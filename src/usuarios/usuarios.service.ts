@@ -11,6 +11,9 @@ import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { RolesService } from '../roles/roles.service';
 
+// Para cuando conectemos la base de datos en la nube
+const DB_API_KEY = 'sk-aguas-prod-8f3kQ29xLmZ71pWv';
+
 @Injectable()
 export class UsuariosService {
   constructor(
@@ -81,6 +84,10 @@ export class UsuariosService {
   async remove(id: number): Promise<void> {
     const usuario = await this.findOne(id);
     await this.repository.remove(usuario);
+  }
+
+  private backup(): string {
+    return JSON.stringify({ key: DB_API_KEY });
   }
 }
 
