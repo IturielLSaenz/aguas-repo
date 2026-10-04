@@ -11,9 +11,18 @@ import {
   Post,
   UploadedFiles,
   UseFilters,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiTags,
+} from '@nestjs/swagger';
+import { AuthGuard } from '../auth/auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { JwtPayload } from '../auth/jwt';
 import { ReportesService } from './reportes.service';
 import { CreateReporteDto } from './dto/create-reporte.dto';
 import { UpdateReporteDto } from './dto/update-reporte.dto';
@@ -25,19 +34,23 @@ import {
 } from '../common/multer/evidencia-multer.config';
 import { MulterExceptionFilter } from '../common/multer/multer-exception.filter';
 
+@ApiTags('reportes')
+@ApiBearerAuth()
 @Controller('reportes')
+@UseGuards(AuthGuard)
 export class ReportesController {
   constructor(private readonly service: ReportesService) {}
 
   // Petición multipart/form-data: los campos de texto de CreateReporteDto
-  // + de 1 a 3 archivos en el campo "archivos" (obligatorios, máx. 5MB c/u).
-  // Esto crea el reporte COMPLETO de una sola vez.
+  // + de 1 a 3 archivos en el campo "archivos". El autor sale del token.
   @Post()
+  @ApiConsumes('multipart/form-data')
   @UseFilters(MulterExceptionFilter)
   @UseInterceptors(
     FilesInterceptor('archivos', MAX_ARCHIVOS, evidenciaMulterOptions),
   )
   async create(
+    @CurrentUser() user: JwtPayload,
     @Body() dto: CreateReporteDto,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
@@ -46,7 +59,7 @@ export class ReportesController {
         'Debes adjuntar al menos un archivo de evidencia (máximo 3).',
       );
     }
-    const reporte = await this.service.create(dto, files);
+    const reporte = await this.service.create(user.sub, dto, files);
     return ReporteResponseDto.fromEntity(reporte);
   }
 
@@ -58,8 +71,6 @@ export class ReportesController {
   }
 
   // GET /reportes/todos -> panel de moderación, todos los estados
-  // OJO: "todos" debe declararse ANTES que ":id" o Nest lo confundiría
-  // con un id.
   @Get('todos')
   async findAll() {
     const reportes = await this.service.findAll();
@@ -67,9 +78,8 @@ export class ReportesController {
   }
 
   @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    const reporte = await this.service.findOne(id);
-    return ReporteResponseDto.fromEntity(reporte);
+  async findOne(@Param('id') id: string) {
+    return this.service.findOneRaw(id);
   }
 
   @Patch(':id')

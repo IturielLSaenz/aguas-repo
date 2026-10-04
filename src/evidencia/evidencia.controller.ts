@@ -41,9 +41,8 @@ export class EvidenciaController {
   }
 
   @Get('reporte/:idReporte')
-  async findByReporte(@Param('idReporte', ParseIntPipe) idReporte: number) {
-    const evidencias = await this.service.findByReporte(idReporte);
-    return evidencias.map(EvidenciaResponseDto.fromEntity);
+  findByReporte(@Param('idReporte') idReporte: string) {
+    return this.service.findByReporte(idReporte);
   }
 
   @Get(':id')

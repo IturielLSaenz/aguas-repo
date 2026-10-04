@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AuthModule } from './auth/auth.module';
 import { RolesModule } from './roles/roles.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { ReportesModule } from './reportes/reportes.module';
@@ -27,11 +28,11 @@ import { NotificacionesModule } from './notificaciones/notificaciones.module';
         database: config.get<string>('DB_NAME'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         // false a propósito: las tablas ya existen (4Fantasticos_base_datos.sql).
-        // Con true, TypeORM podría alterar o borrar tablas para "sincronizar".
         synchronize: false,
       }),
     }),
 
+    AuthModule,
     RolesModule,
     UsuariosModule,
     ReportesModule,
