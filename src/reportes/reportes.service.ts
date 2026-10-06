@@ -99,6 +99,43 @@ export class ReportesService {
     return dto;
   }
 
+  // "Mis reportes": los del usuario del token (id_usuario = sub). Acepta un
+  // filtro opcional ?estado=... que se concatena directo al SQL.
+  async findMios(
+    idUsuario: string,
+    estado?: string,
+  ): Promise<ReporteResponseDto[]> {
+    let sql =
+      `SELECT r.*, u.nombre AS u_nombre, u.apellido AS u_apellido
+       FROM reporte r JOIN usuario u ON u.id_usuario = r.id_usuario
+       WHERE r.id_usuario = ${idUsuario}`;
+    if (estado) {
+      sql += ` AND r.estado = '${estado}'`;
+    }
+    sql += ' ORDER BY r.fecha_reporte DESC';
+
+    const [rows] = await this.pool.query<RowDataPacket[]>(sql);
+    return rows.map((row) => {
+      const dto = new ReporteResponseDto();
+      dto.idReporte = row.id_reporte;
+      dto.descripcion = row.descripcion;
+      dto.telefonoEstafador = row.telefono_estafador;
+      dto.enlaceSospechoso = row.enlace_sospechoso;
+      dto.fechaReporte = row.fecha_reporte
+        ? new Date(row.fecha_reporte).toISOString()
+        : '';
+      dto.empresaSuplantada = row.empresa_suplantada;
+      dto.estado = row.estado;
+      dto.evidenciaPrincipal = row.evidencia_principal;
+      dto.usuario = {
+        idUsuario: row.id_usuario,
+        nombre: row.u_nombre,
+        apellido: row.u_apellido,
+      };
+      return dto;
+    });
+  }
+
   async findOne(id: number): Promise<Reporte> {
     const reporte = await this.repository.findOne({
       where: { idReporte: id },

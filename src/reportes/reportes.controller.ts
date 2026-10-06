@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UploadedFiles,
   UseFilters,
   UseGuards,
@@ -42,7 +43,7 @@ export class ReportesController {
   constructor(private readonly service: ReportesService) {}
 
   // Petición multipart/form-data: los campos de texto de CreateReporteDto
-  // + de 1 a 3 archivos en el campo "archivos". El autor sale del token.
+  // + 1 archivo (una sola evidencia) en el campo "archivos". El autor sale del token.
   @Post()
   @ApiConsumes('multipart/form-data')
   @UseFilters(MulterExceptionFilter)
@@ -56,7 +57,7 @@ export class ReportesController {
   ) {
     if (!files || files.length === 0) {
       throw new BadRequestException(
-        'Debes adjuntar al menos un archivo de evidencia (máximo 3).',
+        'Debes adjuntar un archivo de evidencia.',
       );
     }
     const reporte = await this.service.create(user.sub, dto, files);
@@ -75,6 +76,16 @@ export class ReportesController {
   async findAll() {
     const reportes = await this.service.findAll();
     return reportes.map(ReporteResponseDto.fromEntity);
+  }
+
+  // GET /reportes/mios -> solo los reportes del usuario del token.
+  // OJO: debe declararse ANTES que ":id", o Nest tomaría "mios" como un id.
+  @Get('mios')
+  async findMios(
+    @CurrentUser() user: JwtPayload,
+    @Query('estado') estado?: string,
+  ) {
+    return this.service.findMios(user.sub, estado);
   }
 
   @Get(':id')

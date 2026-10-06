@@ -8,7 +8,7 @@ import {
 import { Response } from 'express';
 import { MulterError } from 'multer';
 
-// Sin este filtro, un archivo > 5MB (o más de 3 archivos) truena como error
+// Sin este filtro, un archivo > 5MB (o más de 1 archivo) truena como error
 // 500 sin explicar por qué (MulterError no es un HttpException). Con esto,
 // el cliente recibe un 400 con un mensaje claro, igual que cualquier otro
 // error de validación.
@@ -27,7 +27,7 @@ export class MulterExceptionFilter implements ExceptionFilter {
       case 'LIMIT_FILE_COUNT':
       case 'LIMIT_UNEXPECTED_FILE':
         httpException = new BadRequestException(
-          'Se permiten máximo 3 archivos de evidencia por petición.',
+          'Se permite máximo 1 archivo de evidencia por petición.',
         );
         break;
       default:

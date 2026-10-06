@@ -3,7 +3,6 @@ import { diskStorage } from 'multer';
 import { extname } from 'node:path';
 import type { Request } from 'express';
 
-// aqui colocamos los tipos de archivo permitidos!
 const TIPOS_PERMITIDOS = [
   'application/pdf',
   'image/jpeg',
@@ -20,7 +19,7 @@ const TIPOS_PERMITIDOS = [
 const EXTENSIONES_PERMITIDAS = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp'];
 
 export const CINCO_MB = 5 * 1024 * 1024;
-export const MAX_ARCHIVOS = 3;
+export const MAX_ARCHIVOS = 1;  // una sola evidencia por reporte
 
 // Se usa en @UseInterceptors(FilesInterceptor('archivos', MAX_ARCHIVOS, evidenciaMulterOptions))
 // El límite de fileSize aplica POR archivo (cada uno hasta 5MB); el límite
