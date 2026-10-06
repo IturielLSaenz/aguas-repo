@@ -6,7 +6,7 @@ export const DB_POOL = 'DB_POOL';
 
 // La conexión a la base de datos de Aguas.
 // NOTA: ajusta usuario/password a los de TU MySQL (los mismos de tu .env).
-const DATABASE_URL = 'mysql://root:root@localhost:3306/aguas_db';
+const DATABASE_URL = 'mysql://aguas_app:MegaTera77@localhost:3306/aguas_db';
 
 @Module({
   providers: [
