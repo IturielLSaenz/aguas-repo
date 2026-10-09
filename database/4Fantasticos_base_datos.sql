@@ -15,14 +15,14 @@ USE aguas_db;
 -- ---------------------------------------------------------------------
 CREATE TABLE rol (
     id_rol       INT AUTO_INCREMENT PRIMARY KEY,
-    nombre_rol   VARCHAR(50) NOT NULL UNIQUE,   -- usuario, moderador, administrador
+    nombre_rol   VARCHAR(50) NOT NULL UNIQUE,   -- usuario, SSC, administrador
     descripcion  VARCHAR(255)
 ) ENGINE=InnoDB;
 
 INSERT INTO rol (nombre_rol, descripcion) VALUES
-    ('usuario',        'Puede crear y consultar reportes'),
-    ('moderador',       'Puede revisar y aprobar/rechazar reportes'),
-    ('administrador',  'Gestiona cuentas, roles y estadísticas globales');
+    ('usuario',        'Puede crear, consultar y dar seguimiento a sus reportes'),
+    ('SSC',            'Consulta reportes, estadísticas y usuarios sin modificarlos'),
+    ('administrador',  'Aprueba o rechaza reportes, gestiona cuentas y roles, y consulta la bitácora');
 
 -- ---------------------------------------------------------------------
 -- USUARIO  (Rol 1 --- N Usuario)
@@ -83,7 +83,7 @@ CREATE TABLE reporte (
 CREATE TABLE bitacora (
     id_bitacora  INT AUTO_INCREMENT PRIMARY KEY,
     id_reporte   INT NOT NULL,
-    id_usuario   INT NULL,           -- quién ejecutó la acción (moderador/admin)
+    id_usuario   INT NULL,           -- quién ejecutó la acción (administrador)
     fecha_hora   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     accion       VARCHAR(100) NOT NULL,
     descripcion  TEXT,
