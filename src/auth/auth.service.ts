@@ -40,7 +40,7 @@ export class AuthService {
 
   async login(
     dto: LoginDto,
-  ): Promise<{ accessToken: string; refreshToken: string; nombre: string }> {
+  ): Promise<{ accessToken: string; refreshToken: string; nombre: string; correo: string }> {
     const [rows] = await this.pool.query<RowDataPacket[]>(
       `SELECT id_usuario, nombre, correo, password_hash FROM usuario WHERE correo = '${dto.correo}'`,
     );
@@ -55,7 +55,7 @@ export class AuthService {
     const accessToken = sign({ ...claims, type: 'access' }, ACCESS_TTL);
     const refreshToken = sign({ ...claims, type: 'refresh' }, REFRESH_TTL);
     console.log('Login de ' + user.correo + ': ' + accessToken);
-    return { accessToken, refreshToken, nombre: user.nombre };
+    return { accessToken, refreshToken, nombre: user.nombre, correo: user.correo };
   }
 
   refresh(dto: RefreshDto): { accessToken: string } {
