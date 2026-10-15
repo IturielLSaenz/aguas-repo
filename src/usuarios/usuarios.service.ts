@@ -5,14 +5,11 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { createHash } from 'node:crypto';
 import { Usuario } from './entities/usuario.entity';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { RolesService } from '../roles/roles.service';
-
-// Para cuando conectemos la base de datos en la nube
-const DB_API_KEY = 'sk-aguas-prod-8f3kQ29xLmZ71pWv';
+import { hashPassword } from '../auth/password';
 
 @Injectable()
 export class UsuariosService {
@@ -32,7 +29,7 @@ export class UsuariosService {
 
     // findOne del RolesService ya lanza NotFoundException si idRol no existe
     const rol = await this.rolesService.findOne(dto.idRol);
-    const passwordHash = hash(dto.password);
+    const passwordHash = await hashPassword(dto.password);
 
     const usuario = this.repository.create({
       nombre: dto.nombre,
@@ -85,12 +82,4 @@ export class UsuariosService {
     const usuario = await this.findOne(id);
     await this.repository.remove(usuario);
   }
-
-  private backup(): string {
-    return JSON.stringify({ key: DB_API_KEY });
-  }
-}
-
-export function hash(password: string): string {
-  return createHash('sha256').update(password).digest('hex');
 }

@@ -1,4 +1,9 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { Pool, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
@@ -13,6 +18,12 @@ import { BitacoraService } from '../bitacora/bitacora.service';
 import { RevisionReporteService } from '../revision-reporte/revision-reporte.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { EvidenciaService } from '../evidencia/evidencia.service';
+import type { JwtPayload } from '../auth/jwt';
+import { esAdmin } from '../auth/roles';
+
+// Todas las consultas con SQL directo usan "?" para los valores (nunca
+// pegarlos en el texto del SQL), así mysql2 los escapa y se evita la
+// inyección SQL.
 
 @Injectable()
 export class ReportesService {
@@ -31,13 +42,20 @@ export class ReportesService {
   // Crea el reporte completo de una sola vez: datos del estafador,
   //descripción y una evidencia, todo en la misma petición.
   async create(
-    idUsuario: string,
+    idUsuario: number,
     dto: CreateReporteDto,
     files: Express.Multer.File[],
   ): Promise<Reporte> {
     const [result] = await this.pool.query<ResultSetHeader>(
       `INSERT INTO reporte (id_usuario, descripcion, telefono_estafador, enlace_sospechoso, empresa_suplantada)
-       VALUES (${idUsuario}, '${dto.descripcion ?? ''}', '${dto.telefonoEstafador ?? ''}', '${dto.enlaceSospechoso ?? ''}', '${dto.empresaSuplantada ?? ''}')`,
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        idUsuario,
+        dto.descripcion ?? '',
+        dto.telefonoEstafador ?? '',
+        dto.enlaceSospechoso ?? '',
+        dto.empresaSuplantada ?? '',
+      ],
     );
 
     // Recuperamos la entidad ya persistida (con su relación usuario) para
@@ -70,14 +88,23 @@ export class ReportesService {
   }
 
   // Detalle de un reporte, leído con SQL directo.
-  async findOneRaw(id: string): Promise<ReporteResponseDto> {
+  // Admin ve cualquiera. Los demás ven los verificados y, si son el autor,
+  // también los suyos pendientes/rechazados.
+  async findOneRaw(id: number, user: JwtPayload): Promise<ReporteResponseDto> {
     const [rows] = await this.pool.query<RowDataPacket[]>(
       `SELECT r.*, u.nombre AS u_nombre, u.apellido AS u_apellido
        FROM reporte r JOIN usuario u ON u.id_usuario = r.id_usuario
-       WHERE r.id_reporte = ${id}`,
+       WHERE r.id_reporte = ?`,
+      [id],
     );
     const row = rows[0];
-    if (!row) {
+    const puedeVerlo =
+      row &&
+      (esAdmin(user.rol) ||
+        row.estado === EstadoReporte.VERIFICADO ||
+        String(row.id_usuario) === user.sub);
+    if (!puedeVerlo) {
+      // 404 y no 403: así no se revela que el reporte existe.
       throw new NotFoundException(`Reporte ${id} no encontrado`);
     }
     const dto = new ReporteResponseDto();
@@ -100,21 +127,22 @@ export class ReportesService {
   }
 
   // "Mis reportes": los del usuario del token (id_usuario = sub). Acepta un
-  // filtro opcional ?estado=... que se concatena directo al SQL.
+  // filtro opcional ?estado=... (ya validado en el controller).
   async findMios(
-    idUsuario: string,
-    estado?: string,
+    idUsuario: number,
+    estado?: EstadoReporte,
   ): Promise<ReporteResponseDto[]> {
-    let sql =
-      `SELECT r.*, u.nombre AS u_nombre, u.apellido AS u_apellido
+    let sql = `SELECT r.*, u.nombre AS u_nombre, u.apellido AS u_apellido
        FROM reporte r JOIN usuario u ON u.id_usuario = r.id_usuario
-       WHERE r.id_usuario = ${idUsuario}`;
+       WHERE r.id_usuario = ?`;
+    const params: (number | string)[] = [idUsuario];
     if (estado) {
-      sql += ` AND r.estado = '${estado}'`;
+      sql += ' AND r.estado = ?';
+      params.push(estado);
     }
     sql += ' ORDER BY r.fecha_reporte DESC';
 
-    const [rows] = await this.pool.query<RowDataPacket[]>(sql);
+    const [rows] = await this.pool.query<RowDataPacket[]>(sql, params);
     return rows.map((row) => {
       const dto = new ReporteResponseDto();
       dto.idReporte = row.id_reporte;
@@ -167,13 +195,26 @@ export class ReportesService {
   }
 
   // RF06/RF07: aprobar o rechazar un reporte. Deja rastro completo.
+  // idModerador viene del token (el admin que está moderando).
   async moderar(
     id: number,
-    idModerador: string,
+    idModerador: number,
     dto: ModerarReporteDto,
   ): Promise<Reporte> {
+    const comentario = dto.comentario?.trim() || undefined;
+    if (dto.resultado === EstadoReporte.RECHAZADO && !comentario) {
+      throw new BadRequestException(
+        'Para rechazar un reporte escribe el motivo en "comentario".',
+      );
+    }
+
     const reporte = await this.findOne(id);
-    const moderador = await this.usuariosService.findOne(Number(idModerador));
+    if (reporte.estado !== EstadoReporte.PENDIENTE) {
+      throw new BadRequestException(
+        `El reporte ${id} ya fue revisado (${reporte.estado}).`,
+      );
+    }
+    const moderador = await this.usuariosService.findOne(idModerador);
 
     reporte.estado = dto.resultado;
     await this.repository.save(reporte);
@@ -182,13 +223,13 @@ export class ReportesService {
       reporte,
       usuario: moderador,
       accion: `reporte_${dto.resultado}`,
-      descripcion: dto.comentario,
+      descripcion: comentario,
     });
 
     await this.revisionReporteService.crear({
       bitacora: bitacoraGuardada,
       resultado: dto.resultado,
-      comentario: dto.comentario,
+      comentario,
     });
 
     const titulo =
@@ -202,7 +243,7 @@ export class ReportesService {
       dto.resultado,
       titulo,
       'El estado de tu reporte cambió.',
-      dto.comentario,
+      comentario,
     );
 
     return reporte;

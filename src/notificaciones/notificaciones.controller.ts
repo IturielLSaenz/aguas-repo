@@ -4,18 +4,17 @@ import {
   Param,
   ParseIntPipe,
   Patch,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth } from '@nestjs/swagger';
-import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { JwtPayload } from '../auth/jwt';
 import { NotificacionesService } from './notificaciones.service';
 import { NotificacionResponseDto } from './dto/notificacion-response.dto';
 
 @ApiBearerAuth()
+// Cada quien ve y marca solo SUS notificaciones (el token lo exige el
+// guard global de AuthModule).
 @Controller('notificaciones')
-@UseGuards(AuthGuard)
 export class NotificacionesController {
   constructor(private readonly service: NotificacionesService) {}
 

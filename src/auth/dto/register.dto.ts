@@ -1,6 +1,5 @@
 import {
   IsEmail,
-  IsInt,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -31,8 +30,6 @@ export class RegisterDto {
   @MaxLength(20)
   telefono?: string;
 
-  // Opcional: si no viene, se usa el rol 'usuario' (id_rol = 1).
-  @IsOptional()
-  @IsInt()
-  idRol?: number;
+  // Ya no se acepta idRol: el registro público siempre crea un 'usuario'.
+  // (Si alguien lo manda, ValidationPipe con whitelist lo descarta.)
 }
