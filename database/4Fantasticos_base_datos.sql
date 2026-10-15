@@ -134,15 +134,17 @@ CREATE INDEX idx_bitacora_reporte  ON bitacora(id_reporte);
 
 -- ---------------------------------------------------------------------
 -- DATOS DE EJEMPLO (para validar el funcionamiento de la base)
--- Todas las cuentas de ejemplo usan la contraseña "Prueba123!" (hash bcrypt).
+-- Todas las cuentas de ejemplo usan la contraseña "Prueba123!" (hash scrypt,
+-- el mismo formato que genera el backend en src/auth/password.ts).
+-- Roles: María, Jorge y Ana = usuario; Laura = SSC; Carlos y Sofía = administrador.
 -- ---------------------------------------------------------------------
 INSERT INTO usuario (nombre, apellido, correo, password_hash, telefono, id_rol) VALUES
-    ('María',   'López',     'maria.lopez@gmail.com',   '$2b$10$0j7HQ5qh9QoET6VMB2Y7iOR1kOpDK95ElJcnvx7hMFcwLfI9GL5iO', '5512345678', 1),
-    ('Jorge',   'Hernández', 'jorge.hdz@outlook.com',   '$2b$10$0j7HQ5qh9QoET6VMB2Y7iOR1kOpDK95ElJcnvx7hMFcwLfI9GL5iO', '5523456789', 1),
-    ('Ana',     'Torres',    'ana.torres@yahoo.com',    '$2b$10$0j7HQ5qh9QoET6VMB2Y7iOR1kOpDK95ElJcnvx7hMFcwLfI9GL5iO', NULL,         1),
-    ('Laura',   'Ramírez',   'laura.ramirez@ssc.cdmx.gob.mx',   '$2b$10$0j7HQ5qh9QoET6VMB2Y7iOR1kOpDK95ElJcnvx7hMFcwLfI9GL5iO', NULL, 2),
-    ('Carlos',  'Mendoza',   'carlos.mendoza@redciberseguridad.mx', '$2b$10$0j7HQ5qh9QoET6VMB2Y7iOR1kOpDK95ElJcnvx7hMFcwLfI9GL5iO', NULL, 3),
-    ('Sofía',   'Castro',    'sofia.castro@redciberseguridad.mx',   '$2b$10$0j7HQ5qh9QoET6VMB2Y7iOR1kOpDK95ElJcnvx7hMFcwLfI9GL5iO', NULL, 3);
+    ('María',   'López',     'maria.lopez@gmail.com',   'scrypt$9QRqDdJSyVupxY99z1BUig==$dVmlW28sXuYcUZuvRBWj2lLVynIlTZVGFij75cxFZs3uNd+/BSCFwLgOJAAQDvaGzFV2MudBgipkxH1EKun9WA==', '5512345678', 1),
+    ('Jorge',   'Hernández', 'jorge.hdz@outlook.com',   'scrypt$9QRqDdJSyVupxY99z1BUig==$dVmlW28sXuYcUZuvRBWj2lLVynIlTZVGFij75cxFZs3uNd+/BSCFwLgOJAAQDvaGzFV2MudBgipkxH1EKun9WA==', '5523456789', 1),
+    ('Ana',     'Torres',    'ana.torres@yahoo.com',    'scrypt$9QRqDdJSyVupxY99z1BUig==$dVmlW28sXuYcUZuvRBWj2lLVynIlTZVGFij75cxFZs3uNd+/BSCFwLgOJAAQDvaGzFV2MudBgipkxH1EKun9WA==', NULL,         1),
+    ('Laura',   'Ramírez',   'laura.ramirez@ssc.cdmx.gob.mx',   'scrypt$9QRqDdJSyVupxY99z1BUig==$dVmlW28sXuYcUZuvRBWj2lLVynIlTZVGFij75cxFZs3uNd+/BSCFwLgOJAAQDvaGzFV2MudBgipkxH1EKun9WA==', NULL, 2),
+    ('Carlos',  'Mendoza',   'carlos.mendoza@redciberseguridad.mx', 'scrypt$9QRqDdJSyVupxY99z1BUig==$dVmlW28sXuYcUZuvRBWj2lLVynIlTZVGFij75cxFZs3uNd+/BSCFwLgOJAAQDvaGzFV2MudBgipkxH1EKun9WA==', NULL, 3),
+    ('Sofía',   'Castro',    'sofia.castro@redciberseguridad.mx',   'scrypt$9QRqDdJSyVupxY99z1BUig==$dVmlW28sXuYcUZuvRBWj2lLVynIlTZVGFij75cxFZs3uNd+/BSCFwLgOJAAQDvaGzFV2MudBgipkxH1EKun9WA==', NULL, 3);
 
 INSERT INTO reporte (id_usuario, descripcion, telefono_estafador, enlace_sospechoso, empresa_suplantada, estado, evidencia_principal) VALUES
     (1, 'Recibí un SMS que decía que mi paquete estaba retenido en aduana y que debía pagar $89 en un enlace.', '5587654321', 'https://dhl-aduana-pago.com', 'DHL', 'verificado', 'uploads/evidencias/rep1_sms.jpg'),
@@ -168,7 +170,8 @@ INSERT INTO revision_reporte (id_bitacora, resultado, comentario) VALUES
     (2, 'verificado', 'La conversación muestra la solicitud del NIP.'),
     (3, 'rechazado',  'El enlace corresponde al sitio oficial de Amazon, no es un fraude.');
 
-INSERT INTO notificacion (id_usuario, mensaje, leida) VALUES
-    (1, 'Tu reporte #1 fue verificado y ya es visible en el buscador.', TRUE),
-    (2, 'Tu reporte #2 fue verificado y ya es visible en el buscador.', FALSE),
-    (2, 'Tu reporte #5 fue rechazado. Motivo: el enlace corresponde al sitio oficial de Amazon.', FALSE);
+-- Mismo formato que genera el backend al moderar (reportes.service.ts).
+INSERT INTO notificacion (id_usuario, id_reporte, tipo, titulo, mensaje, motivo, leida) VALUES
+    (1, 1, 'verificado', 'Tu reporte fue verificado', 'El estado de tu reporte cambió.', NULL, TRUE),
+    (2, 2, 'verificado', 'Tu reporte fue verificado', 'El estado de tu reporte cambió.', NULL, FALSE),
+    (2, 5, 'rechazado',  'Tu reporte fue rechazado',  'El estado de tu reporte cambió.', 'El enlace corresponde al sitio oficial de Amazon, no es un fraude.', FALSE);

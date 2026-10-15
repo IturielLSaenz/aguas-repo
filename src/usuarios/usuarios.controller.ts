@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Delete,
   Get,
   HttpCode,
@@ -9,22 +10,29 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { JwtPayload } from '../auth/jwt';
+import { esAdmin, ROL, Roles } from '../auth/roles';
 import { UsuariosService } from './usuarios.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { UsuarioResponseDto } from './dto/usuario-response.dto';
 
+// Gestión de cuentas: solo administrador.
+// Excepción: GET /usuarios/:id, cada quien puede ver su propio perfil.
 @Controller('usuarios')
 export class UsuariosController {
   constructor(private readonly service: UsuariosService) {}
 
   @Post()
+  @Roles(ROL.ADMIN)
   async create(@Body() dto: CreateUsuarioDto): Promise<UsuarioResponseDto> {
     const usuario = await this.service.create(dto);
     return UsuarioResponseDto.fromEntity(usuario);
   }
 
   @Get()
+  @Roles(ROL.ADMIN)
   async findAll(): Promise<UsuarioResponseDto[]> {
     const usuarios = await this.service.findAll();
     return usuarios.map(UsuarioResponseDto.fromEntity);
@@ -33,12 +41,17 @@ export class UsuariosController {
   @Get(':id')
   async findOne(
     @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: JwtPayload,
   ): Promise<UsuarioResponseDto> {
+    if (!esAdmin(user.rol) && String(id) !== user.sub) {
+      throw new ForbiddenException('No tienes permiso para ver este usuario');
+    }
     const usuario = await this.service.findOne(id);
     return UsuarioResponseDto.fromEntity(usuario);
   }
 
   @Patch(':id')
+  @Roles(ROL.ADMIN)
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateUsuarioDto,
@@ -48,6 +61,7 @@ export class UsuariosController {
   }
 
   @Delete(':id')
+  @Roles(ROL.ADMIN)
   @HttpCode(204)
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.service.remove(id);

@@ -9,10 +9,13 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { ROL, Roles } from '../auth/roles';
 import { RolesService } from './roles.service';
 import { CreateRolDto } from './dto/create-rol.dto';
 import { UpdateRolDto } from './dto/update-rol.dto';
 
+// Catálogo de roles: solo administrador.
+@Roles(ROL.ADMIN)
 @Controller('roles')
 export class RolesController {
   constructor(private readonly service: RolesService) {}
