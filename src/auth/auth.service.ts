@@ -14,7 +14,6 @@ import { sign, verify } from './jwt';
 import {
   dummyHash,
   hashPassword,
-  needsRehash,
   verifyPassword,
 } from './password';
 import { ROL } from './roles';
@@ -95,15 +94,6 @@ export class AuthService {
     }
     if (!(await verifyPassword(dto.password!, user.password_hash))) {
       throw new UnauthorizedException(CREDENCIALES_INVALIDAS);
-    }
-
-    // Cuentas viejas (SHA-256 sin sal): aprovechamos que tenemos la
-    // contraseña correcta para guardarla ya con scrypt.
-    if (needsRehash(user.password_hash)) {
-      await this.pool.query(
-        'UPDATE usuario SET password_hash = ? WHERE id_usuario = ?',
-        [await hashPassword(dto.password!), user.id_usuario],
-      );
     }
 
     const claims = {
