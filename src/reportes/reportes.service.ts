@@ -28,8 +28,8 @@ export class ReportesService {
     private readonly evidenciaService: EvidenciaService,
   ) {}
 
-  // Crea el reporte COMPLETO de una sola vez: datos del estafador,
-  // descripción, y de 1 a 3 evidencias — todo en la misma petición.
+  // Crea el reporte completo de una sola vez: datos del estafador,
+  //descripción y una evidencia, todo en la misma petición.
   async create(
     idUsuario: string,
     dto: CreateReporteDto,
@@ -167,9 +167,13 @@ export class ReportesService {
   }
 
   // RF06/RF07: aprobar o rechazar un reporte. Deja rastro completo.
-  async moderar(id: number, dto: ModerarReporteDto): Promise<Reporte> {
+  async moderar(
+    id: number,
+    idModerador: string,
+    dto: ModerarReporteDto,
+  ): Promise<Reporte> {
     const reporte = await this.findOne(id);
-    const moderador = await this.usuariosService.findOne(dto.idModerador);
+    const moderador = await this.usuariosService.findOne(Number(idModerador));
 
     reporte.estado = dto.resultado;
     await this.repository.save(reporte);
@@ -187,9 +191,18 @@ export class ReportesService {
       comentario: dto.comentario,
     });
 
+    const titulo =
+      dto.resultado === EstadoReporte.VERIFICADO
+        ? 'Tu reporte fue verificado'
+        : 'Tu reporte fue rechazado';
+
     await this.notificacionesService.crear(
       reporte.usuario.idUsuario,
-      `Tu reporte #${reporte.idReporte} fue ${dto.resultado}.`,
+      reporte,
+      dto.resultado,
+      titulo,
+      'El estado de tu reporte cambió.',
+      dto.comentario,
     );
 
     return reporte;

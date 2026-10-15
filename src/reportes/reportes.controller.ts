@@ -105,10 +105,11 @@ export class ReportesController {
   // RF06/RF07 - aprobar/rechazar, deja bitácora + revisión automáticamente
   @Patch(':id/moderar')
   async moderar(
+    @CurrentUser() user: JwtPayload,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ModerarReporteDto,
   ) {
-    const reporte = await this.service.moderar(id, dto);
+    const reporte = await this.service.moderar(id, user.sub, dto);
     return ReporteResponseDto.fromEntity(reporte);
   }
 
