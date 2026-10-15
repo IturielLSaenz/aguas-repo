@@ -40,12 +40,16 @@ CREATE TABLE usuario (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
--- NOTIFICACION  (Usuario 1 --- N Notificacion)
+-- NOTIFICACION  (Usuario 1 --- N Notificacion / Reporte 1 --- N Notificacion)
 -- ---------------------------------------------------------------------
 CREATE TABLE notificacion (
     id_notificacion     INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario          INT NOT NULL,
+    id_reporte          INT NOT NULL,
+    tipo                VARCHAR(50) NOT NULL,
+    titulo              VARCHAR(255) NOT NULL,
     mensaje             TEXT NOT NULL,
+    motivo              TEXT,
     fecha_notificacion  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     leida               BOOLEAN DEFAULT FALSE,
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE
@@ -72,6 +76,12 @@ CREATE TABLE reporte (
     evidencia_principal VARCHAR(255),   -- ruta/URL de la evidencia de portada, mostrada en el buscador sin JOIN a Evidencia
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
 ) ENGINE=InnoDB;
+
+ALTER TABLE notificacion
+    ADD CONSTRAINT notificacion_ibfk_2
+    FOREIGN KEY (id_reporte)
+    REFERENCES reporte(id_reporte)
+    ON DELETE CASCADE;
 
 -- ---------------------------------------------------------------------
 -- BITACORA  (Reporte 1 --- N Bitacora)
