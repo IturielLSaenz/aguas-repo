@@ -61,15 +61,14 @@ CREATE TABLE notificacion (
 CREATE TABLE reporte (
     id_reporte          INT AUTO_INCREMENT PRIMARY KEY,
     id_usuario          INT NOT NULL,   -- quién reporta
-    -- Opcional: nace vacía en el paso 1 (datos del estafador) y se llena
-    -- en el paso 2, junto con la evidencia. Sigue siendo opcional incluso
-    -- en el paso 2.
-    descripcion         TEXT NULL,
+    -- Obligatoria: el usuario debe describir el intento de fraude
+    descripcion         TEXT NOT NULL,
     telefono_estafador  VARCHAR(20),    -- paso 1
     enlace_sospechoso   VARCHAR(255),   -- paso 1
     fecha_reporte       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     empresa_suplantada  VARCHAR(150),
-    estado              VARCHAR(20) DEFAULT 'pendiente',  -- pendiente, verificado, rechazado
+    estado              VARCHAR(20) NOT NULL DEFAULT 'pendiente'
+                        CHECK (estado IN ('pendiente', 'verificado', 'rechazado')),
     evidencia_principal VARCHAR(255),   -- ruta/URL de la evidencia de portada, mostrada en el buscador sin JOIN a Evidencia
     FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario)
 ) ENGINE=InnoDB;
@@ -122,3 +121,44 @@ CREATE TABLE revision_reporte (
 CREATE INDEX idx_reporte_estado    ON reporte(estado);
 CREATE INDEX idx_reporte_empresa   ON reporte(empresa_suplantada);
 CREATE INDEX idx_bitacora_reporte  ON bitacora(id_reporte);
+
+-- ---------------------------------------------------------------------
+-- DATOS DE EJEMPLO (para validar el funcionamiento de la base)
+-- Todas las cuentas de ejemplo usan la contraseña "Prueba123!" (hash bcrypt).
+-- ---------------------------------------------------------------------
+INSERT INTO usuario (nombre, apellido, correo, password_hash, telefono, id_rol) VALUES
+    ('María',   'López',     'maria.lopez@gmail.com',   '$2b$10$0j7HQ5qh9QoET6VMB2Y7iOR1kOpDK95ElJcnvx7hMFcwLfI9GL5iO', '5512345678', 1),
+    ('Jorge',   'Hernández', 'jorge.hdz@outlook.com',   '$2b$10$0j7HQ5qh9QoET6VMB2Y7iOR1kOpDK95ElJcnvx7hMFcwLfI9GL5iO', '5523456789', 1),
+    ('Ana',     'Torres',    'ana.torres@yahoo.com',    '$2b$10$0j7HQ5qh9QoET6VMB2Y7iOR1kOpDK95ElJcnvx7hMFcwLfI9GL5iO', NULL,         1),
+    ('Laura',   'Ramírez',   'laura.ramirez@ssc.cdmx.gob.mx',   '$2b$10$0j7HQ5qh9QoET6VMB2Y7iOR1kOpDK95ElJcnvx7hMFcwLfI9GL5iO', NULL, 2),
+    ('Carlos',  'Mendoza',   'carlos.mendoza@redciberseguridad.mx', '$2b$10$0j7HQ5qh9QoET6VMB2Y7iOR1kOpDK95ElJcnvx7hMFcwLfI9GL5iO', NULL, 3),
+    ('Sofía',   'Castro',    'sofia.castro@redciberseguridad.mx',   '$2b$10$0j7HQ5qh9QoET6VMB2Y7iOR1kOpDK95ElJcnvx7hMFcwLfI9GL5iO', NULL, 3);
+
+INSERT INTO reporte (id_usuario, descripcion, telefono_estafador, enlace_sospechoso, empresa_suplantada, estado, evidencia_principal) VALUES
+    (1, 'Recibí un SMS que decía que mi paquete estaba retenido en aduana y que debía pagar $89 en un enlace.', '5587654321', 'https://dhl-aduana-pago.com', 'DHL', 'verificado', 'uploads/evidencias/rep1_sms.jpg'),
+    (2, 'Mensaje de WhatsApp de un supuesto ejecutivo del banco pidiendo mi NIP para cancelar un cargo.', '5598765432', NULL, 'BBVA', 'verificado', 'uploads/evidencias/rep2_chat.png'),
+    (3, 'Correo que imita a Mercado Libre diciendo que mi cuenta fue suspendida y pide iniciar sesión en un enlace.', NULL, 'https://mercadolibre-verificacion.net', 'Mercado Libre', 'pendiente', 'uploads/evidencias/rep3_correo.png'),
+    (1, 'Otro SMS del mismo número, ahora diciendo que mi paquete será devuelto si no pago hoy.', '5587654321', 'https://dhl-aduana-pago.com', 'DHL', 'pendiente', NULL),
+    (2, 'Me llegó un mensaje de promoción de Amazon, pero el enlace llevaba a la página oficial.', NULL, 'https://www.amazon.com.mx', 'Amazon', 'rechazado', 'uploads/evidencias/rep5_promo.png');
+
+INSERT INTO evidencia (id_reporte, tipo_evidencia, archivo, formato, descripcion) VALUES
+    (1, 'imagen', 'uploads/evidencias/rep1_sms.jpg',    'jpg', 'Captura del SMS recibido'),
+    (1, 'imagen', 'uploads/evidencias/rep1_pagina.png', 'png', 'Captura de la página de pago falsa'),
+    (2, 'imagen', 'uploads/evidencias/rep2_chat.png',   'png', 'Captura de la conversación de WhatsApp'),
+    (3, 'imagen', 'uploads/evidencias/rep3_correo.png', 'png', 'Captura del correo recibido'),
+    (5, 'imagen', 'uploads/evidencias/rep5_promo.png',  'png', 'Captura del mensaje de promoción');
+
+INSERT INTO bitacora (id_reporte, id_usuario, accion, descripcion) VALUES
+    (1, 5, 'reporte_aprobado',  'Evidencia clara del SMS y de la página de pago falsa.'),
+    (2, 6, 'reporte_aprobado',  'La conversación muestra la solicitud del NIP.'),
+    (5, 5, 'reporte_rechazado', 'El enlace corresponde al sitio oficial de Amazon.');
+
+INSERT INTO revision_reporte (id_bitacora, resultado, comentario) VALUES
+    (1, 'verificado', 'Evidencia clara del SMS y de la página de pago falsa.'),
+    (2, 'verificado', 'La conversación muestra la solicitud del NIP.'),
+    (3, 'rechazado',  'El enlace corresponde al sitio oficial de Amazon, no es un fraude.');
+
+INSERT INTO notificacion (id_usuario, mensaje, leida) VALUES
+    (1, 'Tu reporte #1 fue verificado y ya es visible en el buscador.', TRUE),
+    (2, 'Tu reporte #2 fue verificado y ya es visible en el buscador.', FALSE),
+    (2, 'Tu reporte #5 fue rechazado. Motivo: el enlace corresponde al sitio oficial de Amazon.', FALSE);
