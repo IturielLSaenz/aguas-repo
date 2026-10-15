@@ -57,6 +57,11 @@ export class ReportesController {
     @Body() dto: CreateReporteDto,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
+    if (!dto.telefonoEstafador && !dto.enlaceSospechoso) {
+      throw new BadRequestException(
+        'Escribe el teléfono o el enlace del estafador (al menos uno de los dos).',
+      );
+    }
     if (!files || files.length === 0) {
       throw new BadRequestException(
         'Debes adjuntar un archivo de evidencia.',
