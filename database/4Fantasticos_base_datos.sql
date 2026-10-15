@@ -170,7 +170,8 @@ INSERT INTO revision_reporte (id_bitacora, resultado, comentario) VALUES
     (2, 'verificado', 'La conversación muestra la solicitud del NIP.'),
     (3, 'rechazado',  'El enlace corresponde al sitio oficial de Amazon, no es un fraude.');
 
-INSERT INTO notificacion (id_usuario, mensaje, leida) VALUES
-    (1, 'Tu reporte #1 fue verificado y ya es visible en el buscador.', TRUE),
-    (2, 'Tu reporte #2 fue verificado y ya es visible en el buscador.', FALSE),
-    (2, 'Tu reporte #5 fue rechazado. Motivo: el enlace corresponde al sitio oficial de Amazon.', FALSE);
+-- Mismo formato que genera el backend al moderar (reportes.service.ts).
+INSERT INTO notificacion (id_usuario, id_reporte, tipo, titulo, mensaje, motivo, leida) VALUES
+    (1, 1, 'verificado', 'Tu reporte fue verificado', 'El estado de tu reporte cambió.', NULL, TRUE),
+    (2, 2, 'verificado', 'Tu reporte fue verificado', 'El estado de tu reporte cambió.', NULL, FALSE),
+    (2, 5, 'rechazado',  'Tu reporte fue rechazado',  'El estado de tu reporte cambió.', 'El enlace corresponde al sitio oficial de Amazon, no es un fraude.', FALSE);
