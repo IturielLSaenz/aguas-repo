@@ -6,6 +6,7 @@ import { mkdirSync } from 'node:fs';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { AppModule } from './app.module';
+import { assertJwtSecret } from './auth/jwt';
 
 async function bootstrap() {
   // Multer NO crea la carpeta destino sola; si no existe, el primer upload
@@ -13,6 +14,10 @@ async function bootstrap() {
   mkdirSync(join(process.cwd(), 'uploads'), { recursive: true });
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Aquí el .env ya se leyó. Si falta JWT_SECRET, mejor tronar desde el
+  // arranque con un mensaje claro que en el primer login.
+  assertJwtSecret();
 
   // transform:true para convertir los campos de texto que llegan por
   // multipart/form-data (ej. idReporte) al tipo del DTO.

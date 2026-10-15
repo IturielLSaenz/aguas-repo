@@ -27,9 +27,10 @@ export class NotificacionesService {
     });
   }
 
-  async marcarLeida(id: number): Promise<Notificacion> {
+  // Solo el dueño puede marcarla como leída (si no es suya, 404).
+  async marcarLeida(id: number, idUsuario: number): Promise<Notificacion> {
     const notificacion = await this.repository.findOne({
-      where: { idNotificacion: id },
+      where: { idNotificacion: id, usuario: { idUsuario } },
     });
     if (!notificacion) {
       throw new NotFoundException(`Notificación ${id} no encontrada`);

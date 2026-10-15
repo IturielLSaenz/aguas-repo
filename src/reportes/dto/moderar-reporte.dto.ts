@@ -1,17 +1,17 @@
-import { IsIn, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { EstadoReporte } from '../entities/reporte.entity';
 
 export class ModerarReporteDto {
-  // TEMPORAL: igual que en CreateReporteDto, esto vendrá del token JWT
-  // (el moderador autenticado) una vez que exista el módulo de auth.
-  @IsInt()
-  idModerador: number;
+  // Ya no se manda idModerador: el moderador es el administrador del token.
 
   // Solo estos dos: un reporte nunca "vuelve" a pendiente por moderación
   @IsIn([EstadoReporte.VERIFICADO, EstadoReporte.RECHAZADO])
   resultado: EstadoReporte.VERIFICADO | EstadoReporte.RECHAZADO;
 
+  // Obligatorio al rechazar (se le manda al usuario en la notificación).
+  // Opcional al aprobar.
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   comentario?: string;
 }

@@ -12,6 +12,9 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { JwtPayload } from '../auth/jwt';
+import { ROL, Roles } from '../auth/roles';
 import { EvidenciaService } from './evidencia.service';
 import { CreateEvidenciaDto } from './dto/create-evidencia.dto';
 import { EvidenciaResponseDto } from './dto/evidencia-response.dto';
@@ -35,23 +38,31 @@ export class EvidenciaController {
   async create(
     @Body() dto: CreateEvidenciaDto,
     @UploadedFiles() files: Express.Multer.File[],
+    @CurrentUser() user: JwtPayload,
   ) {
-    const evidencias = await this.service.create(dto.idReporte, files);
+    const evidencias = await this.service.create(dto.idReporte, files, user);
     return evidencias.map(EvidenciaResponseDto.fromEntity);
   }
 
   @Get('reporte/:idReporte')
-  findByReporte(@Param('idReporte') idReporte: string) {
-    return this.service.findByReporte(idReporte);
+  findByReporte(
+    @Param('idReporte', ParseIntPipe) idReporte: number,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.service.findByReporte(idReporte, user);
   }
 
   @Get(':id')
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    const evidencia = await this.service.findOne(id);
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    const evidencia = await this.service.findOneVisible(id, user);
     return EvidenciaResponseDto.fromEntity(evidencia);
   }
 
   @Delete(':id')
+  @Roles(ROL.ADMIN)
   @HttpCode(204)
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.service.remove(id);
