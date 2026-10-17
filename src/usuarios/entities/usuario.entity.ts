@@ -40,6 +40,10 @@ export class Usuario {
   @CreateDateColumn({ name: 'fecha_registro' })
   fechaRegistro: Date;
 
+  // false = suspendida por un administrador (no entra ni crea reportes)
+  @Column({ default: true })
+  activo: boolean;
+
   @OneToMany(() => Reporte, (reporte) => reporte.usuario)
   reportes: Reporte[];
 

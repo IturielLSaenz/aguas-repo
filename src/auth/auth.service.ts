@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   InternalServerErrorException,
@@ -25,6 +26,9 @@ const REFRESH_TTL = 7 * 24 * 60 * 60; // 7 días
 // cualquiera podría averiguar qué correos tienen cuenta.
 const CREDENCIALES_INVALIDAS = 'Correo o contraseña incorrectos';
 
+export const CUENTA_SUSPENDIDA =
+  'Tu cuenta está suspendida. Si crees que es un error, contacta a Aguas!.';
+
 // IMPORTANTE: todas las consultas usan "?" en lugar de pegar los valores en
 // el texto del SQL. mysql2 escapa cada "?" por su cuenta, así un correo como
 // "x' OR '1'='1" se busca literal y no se ejecuta como SQL (inyección SQL).
@@ -45,7 +49,9 @@ export class AuthService {
     }
 
     // El registro público SIEMPRE crea cuentas con rol 'usuario'.
-    // Para dar rol de SSC o administrador, un admin lo cambia desde el panel.
+    // Las cuentas de SSC y administrador se crean con POST /usuarios (solo
+    // admin) o directo en la BD. El rol de una cuenta ya no se puede cambiar
+    // por la API.
     const [roles] = await this.pool.query<RowDataPacket[]>(
       'SELECT id_rol FROM rol WHERE nombre_rol = ?',
       [ROL.USUARIO],
@@ -80,7 +86,7 @@ export class AuthService {
     rol: string;
   }> {
     const [rows] = await this.pool.query<RowDataPacket[]>(
-      `SELECT u.id_usuario, u.nombre, u.correo, u.password_hash, r.nombre_rol
+      `SELECT u.id_usuario, u.nombre, u.correo, u.password_hash, u.activo, r.nombre_rol
        FROM usuario u JOIN rol r ON r.id_rol = u.id_rol
        WHERE u.correo = ?`,
       [dto.correo],
@@ -94,6 +100,11 @@ export class AuthService {
     }
     if (!(await verifyPassword(dto.password!, user.password_hash))) {
       throw new UnauthorizedException(CREDENCIALES_INVALIDAS);
+    }
+    // Se revisa DESPUÉS de la contraseña: así solo el dueño de la cuenta
+    // se entera de que está suspendida.
+    if (!user.activo) {
+      throw new ForbiddenException(CUENTA_SUSPENDIDA);
     }
 
     const claims = {
@@ -117,11 +128,11 @@ export class AuthService {
     if (!payload || payload.type !== 'refresh') {
       throw new UnauthorizedException('Refresh token inválido');
     }
-    // El rol se vuelve a leer de la BD: si un admin le cambió el rol a
-    // alguien (o borró su cuenta), el cambio aplica en el siguiente refresh
-    // y no hasta 7 días después.
+    // La cuenta se vuelve a leer de la BD: si la suspendieron o la borraron,
+    // la sesión se corta en el siguiente refresh (máximo 15 minutos) y no
+    // hasta 7 días después.
     const [rows] = await this.pool.query<RowDataPacket[]>(
-      `SELECT u.id_usuario, u.correo, r.nombre_rol
+      `SELECT u.id_usuario, u.correo, u.activo, r.nombre_rol
        FROM usuario u JOIN rol r ON r.id_rol = u.id_rol
        WHERE u.id_usuario = ?`,
       [Number(payload.sub)],
@@ -129,6 +140,9 @@ export class AuthService {
     const user = rows[0];
     if (!user) {
       throw new UnauthorizedException('Refresh token inválido');
+    }
+    if (!user.activo) {
+      throw new ForbiddenException(CUENTA_SUSPENDIDA);
     }
     const accessToken = sign(
       {
