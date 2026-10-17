@@ -149,8 +149,8 @@ INSERT INTO evidencia (id_reporte, tipo_evidencia, archivo, formato, descripcion
     (5, 'imagen', 'uploads/evidencias/rep5_promo.png',  'png', 'Captura del mensaje de promoción');
 
 INSERT INTO bitacora (id_reporte, id_usuario, accion, descripcion) VALUES
-    (1, 5, 'reporte_aprobado',  'Evidencia clara del SMS y de la página de pago falsa.'),
-    (2, 6, 'reporte_aprobado',  'La conversación muestra la solicitud del NIP.'),
+    (1, 5, 'reporte_verificado',  'Evidencia clara del SMS y de la página de pago falsa.'),
+    (2, 6, 'reporte_verificado',  'La conversación muestra la solicitud del NIP.'),
     (5, 5, 'reporte_rechazado', 'El enlace corresponde al sitio oficial de Amazon.');
 
 INSERT INTO revision_reporte (id_bitacora, resultado, comentario) VALUES
