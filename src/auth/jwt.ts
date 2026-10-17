@@ -1,14 +1,33 @@
-import { createHmac } from 'node:crypto';
-
-// Llave con la que firmamos los tokens.
-const SECRET = 'aguas-secret-2026';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 export interface JwtPayload {
   sub: string;
   correo: string;
+  rol: string;
   type: 'access' | 'refresh';
   iat: number;
   exp: number;
+}
+
+// La llave se lee del .env (JWT_SECRET), nunca del código: el repo es
+// público y con la llave cualquiera podría fabricar tokens válidos.
+// Se lee "tarde" (al firmar/verificar) porque cuando este archivo se carga
+// todavía no se ha leído el .env.
+function secret(): string {
+  const s = process.env.JWT_SECRET;
+  if (!s || s.length < 32) {
+    throw new Error(
+      'Falta JWT_SECRET en el .env (mínimo 32 caracteres). Genera una con: ' +
+        `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`,
+    );
+  }
+  return s;
+}
+
+// Se llama al arrancar para que el server truene de inmediato si falta la
+// llave, y no hasta el primer login.
+export function assertJwtSecret(): void {
+  secret();
 }
 
 function now(): number {
@@ -20,7 +39,7 @@ function b64url(json: object): string {
 }
 
 function hmac(data: string): string {
-  return createHmac('sha256', SECRET).update(data).digest('base64url');
+  return createHmac('sha256', secret()).update(data).digest('base64url');
 }
 
 export function sign(
@@ -34,18 +53,29 @@ export function sign(
 }
 
 export function verify(token: string): JwtPayload | null {
-  const [header, body, signature] = token.split('.');
-  if (!header || !body || !signature) {
+  const [header, body, signature, ...resto] = token.split('.');
+  if (!header || !body || !signature || resto.length > 0) {
     return null;
   }
-  if (hmac(`${header}.${body}`) !== signature) {
+  // Comparación en tiempo constante: con "!==" se puede adivinar la firma
+  // midiendo cuánto tarda el servidor en responder.
+  const esperada = Buffer.from(hmac(`${header}.${body}`));
+  const recibida = Buffer.from(signature);
+  if (
+    esperada.length !== recibida.length ||
+    !timingSafeEqual(esperada, recibida)
+  ) {
     return null;
   }
-  const payload = JSON.parse(
-    Buffer.from(body, 'base64url').toString(),
-  ) as JwtPayload;
-  if (payload.exp < now()) {
+  try {
+    const payload = JSON.parse(
+      Buffer.from(body, 'base64url').toString(),
+    ) as JwtPayload;
+    if (typeof payload.exp !== 'number' || payload.exp < now()) {
+      return null;
+    }
+    return payload;
+  } catch {
     return null;
   }
-  return payload;
 }

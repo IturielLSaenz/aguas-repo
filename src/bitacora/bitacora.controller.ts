@@ -1,7 +1,10 @@
 import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common';
+import { ROL, Roles } from '../auth/roles';
 import { BitacoraService } from './bitacora.service';
 import { BitacoraResponseDto } from './dto/bitacora-response.dto';
 
+// Auditoría: solo administrador.
+@Roles(ROL.ADMIN)
 @Controller('bitacora')
 export class BitacoraController {
   constructor(private readonly service: BitacoraService) {}

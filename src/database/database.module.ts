@@ -4,20 +4,19 @@ import type { Pool } from 'mysql2/promise';
 
 export const DB_POOL = 'DB_POOL';
 
-// La conexión a la base de datos de Aguas.
-// NOTA: ajusta usuario/password a los de TU MySQL (los mismos de tu .env).
-// Cambié esta línea para poder levantar el backend en mi compu.
-// Si no les funciona, cámbienla por:
-// const DATABASE_URL = 'mysql://aguas_app:MegaTera77@localhost:3306/aguas_db';
-const DATABASE_URL = 'mysql://root@localhost:3306/aguas_db';
-
 @Module({
   providers: [
     {
       provide: DB_POOL,
       useFactory: () => {
-        console.log('Conectando a ' + DATABASE_URL);
-        return createPool({ uri: DATABASE_URL });
+        console.log('Conectando a MySQL como ' + process.env.DB_USER);
+        return createPool({
+          host: process.env.DB_HOST,
+          port: Number(process.env.DB_PORT),
+          user: process.env.DB_USER,
+          password: process.env.DB_PASSWORD,
+          database: process.env.DB_NAME,
+        });
       },
     },
   ],
