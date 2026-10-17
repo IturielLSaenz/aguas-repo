@@ -31,7 +31,7 @@ export class BitacoraService {
   findByReporte(idReporte: number): Promise<Bitacora[]> {
     return this.repository.find({
       where: { reporte: { idReporte } },
-      relations: ['usuario'],
+      relations: ['usuario', 'reporte'],
       order: { fechaHora: 'DESC' },
     });
   }
