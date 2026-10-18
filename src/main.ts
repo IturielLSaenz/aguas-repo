@@ -26,11 +26,6 @@ async function bootstrap() {
   // El front (Next.js, otro origen) necesita permiso para llamar a la API.
   app.enableCors();
 
-  // Las evidencias (PDF/imágenes) viven en uploads/. Express las sirve tal
-  // cual: GET /uploads/<archivo> regresa el archivo con su Content-Type,
-  // sin pasar por ningún controller ni guard.
-  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
-
   // Documentación OpenAPI: Swagger UI en /docs, documento crudo en /docs-json.
   const config = new DocumentBuilder()
     .setTitle('Aguas! — API de reportes')
