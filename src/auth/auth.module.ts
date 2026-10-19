@@ -5,9 +5,10 @@ import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { RolesGuard } from './roles.guard';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, MailModule],
   controllers: [AuthController],
   providers: [
     AuthService,
