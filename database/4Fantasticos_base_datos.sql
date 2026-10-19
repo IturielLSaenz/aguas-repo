@@ -44,6 +44,23 @@ CREATE TABLE usuario (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
+-- PASSWORD_RESET
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS password_reset (
+    id_password_reset       INT AUTO_INCREMENT PRIMARY KEY,
+    id_usuario              INT NOT NULL UNIQUE,
+    codigo_hash             VARCHAR(255) NOT NULL,
+    codigo_expira           DATETIME NOT NULL,
+    intentos                INT NOT NULL DEFAULT 0,
+    codigo_verificado       BOOLEAN NOT NULL DEFAULT FALSE,
+    reset_token_hash        CHAR(64) UNIQUE,
+    reset_token_expira      DATETIME,
+    utilizado               BOOLEAN NOT NULL DEFAULT FALSE,
+    ultimo_envio            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
 -- NOTIFICACION  (Usuario 1 --- N Notificacion / Reporte 1 --- N Notificacion)
 -- ---------------------------------------------------------------------
 CREATE TABLE notificacion (
