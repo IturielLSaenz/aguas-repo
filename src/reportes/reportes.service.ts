@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -46,6 +47,13 @@ export class ReportesService {
     dto: CreateReporteDto,
     files: Express.Multer.File[],
   ): Promise<Reporte> {
+    // El token puede seguir vigente unos minutos después de suspender la
+    // cuenta; aquí se revisa en la BD para cortarlo al instante.
+    if (!(await this.usuariosService.estaActivo(idUsuario))) {
+      throw new ForbiddenException(
+        'Tu cuenta está suspendida y no puede enviar reportes.',
+      );
+    }
     const [result] = await this.pool.query<ResultSetHeader>(
       `INSERT INTO reporte (id_usuario, descripcion, telefono_estafador, enlace_sospechoso, empresa_suplantada)
        VALUES (?, ?, ?, ?, ?)`,

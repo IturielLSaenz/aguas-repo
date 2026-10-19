@@ -36,7 +36,28 @@ CREATE TABLE usuario (
     telefono        VARCHAR(20),
     id_rol          INT NOT NULL,
     fecha_registro  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- FALSE = cuenta suspendida por un administrador: no puede iniciar sesión
+    -- ni crear reportes. Para una BD que ya existe:
+    --   ALTER TABLE usuario ADD COLUMN activo BOOLEAN NOT NULL DEFAULT TRUE;
+    activo          BOOLEAN NOT NULL DEFAULT TRUE,
     FOREIGN KEY (id_rol) REFERENCES rol(id_rol)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
+-- PASSWORD_RESET
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS password_reset (
+    id_password_reset       INT AUTO_INCREMENT PRIMARY KEY,
+    id_usuario              INT NOT NULL UNIQUE,
+    codigo_hash             VARCHAR(255) NOT NULL,
+    codigo_expira           DATETIME NOT NULL,
+    intentos                INT NOT NULL DEFAULT 0,
+    codigo_verificado       BOOLEAN NOT NULL DEFAULT FALSE,
+    reset_token_hash        CHAR(64) UNIQUE,
+    reset_token_expira      DATETIME,
+    utilizado               BOOLEAN NOT NULL DEFAULT FALSE,
+    ultimo_envio            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_usuario) REFERENCES usuario(id_usuario) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -161,8 +182,8 @@ INSERT INTO evidencia (id_reporte, tipo_evidencia, archivo, formato, descripcion
     (5, 'imagen', 'uploads/evidencias/rep5_promo.png',  'png', 'Captura del mensaje de promoción');
 
 INSERT INTO bitacora (id_reporte, id_usuario, accion, descripcion) VALUES
-    (1, 5, 'reporte_verificado',  'Evidencia clara del SMS y de la página de pago falsa.'),
-    (2, 6, 'reporte_verificado',  'La conversación muestra la solicitud del NIP.'),
+    (1, 5, 'reporte_verificado', 'Evidencia clara del SMS y de la página de pago falsa.'),
+    (2, 6, 'reporte_verificado', 'La conversación muestra la solicitud del NIP.'),
     (5, 5, 'reporte_rechazado', 'El enlace corresponde al sitio oficial de Amazon.');
 
 INSERT INTO revision_reporte (id_bitacora, resultado, comentario) VALUES

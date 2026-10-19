@@ -17,6 +17,7 @@ import { UsuariosService } from './usuarios.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import { UsuarioResponseDto } from './dto/usuario-response.dto';
+import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
 
 // Gestión de cuentas: solo administrador.
 // Excepción: GET /usuarios/:id, cada quien puede ver su propio perfil.
@@ -33,9 +34,8 @@ export class UsuariosController {
 
   @Get()
   @Roles(ROL.ADMIN)
-  async findAll(): Promise<UsuarioResponseDto[]> {
-    const usuarios = await this.service.findAll();
-    return usuarios.map(UsuarioResponseDto.fromEntity);
+  findAll(): Promise<UsuarioResponseDto[]> {
+    return this.service.findAllConReportes();
   }
 
   @Get(':id')
@@ -57,6 +57,22 @@ export class UsuariosController {
     @Body() dto: UpdateUsuarioDto,
   ): Promise<UsuarioResponseDto> {
     const usuario = await this.service.update(id, dto);
+    return UsuarioResponseDto.fromEntity(usuario);
+  }
+
+  // Suspender ({ activo: false }) o reactivar ({ activo: true }) una cuenta.
+  @Patch(':id/estado')
+  @Roles(ROL.ADMIN)
+  async cambiarEstado(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CambiarEstadoDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<UsuarioResponseDto> {
+    const usuario = await this.service.cambiarEstado(
+      id,
+      dto.activo,
+      Number(user.sub),
+    );
     return UsuarioResponseDto.fromEntity(usuario);
   }
 

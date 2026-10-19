@@ -8,6 +8,11 @@ export class UsuarioResponseDto {
   telefono: string;
   rol: string;
   fechaRegistro: string;
+  activo: boolean;
+  // Solo en GET /usuarios (lista del panel), para detectar cuentas que
+  // mandan muchos reportes falsos.
+  totalReportes?: number;
+  reportesRechazados?: number;
 
   // OJO: nunca se incluye passwordHash aquí. Es intencional, no un olvido.
   static fromEntity(usuario: Usuario): UsuarioResponseDto {
@@ -19,6 +24,7 @@ export class UsuarioResponseDto {
     dto.telefono = usuario.telefono;
     dto.rol = usuario.rol?.nombreRol;
     dto.fechaRegistro = usuario.fechaRegistro?.toISOString();
+    dto.activo = Boolean(usuario.activo);
     return dto;
   }
 }
